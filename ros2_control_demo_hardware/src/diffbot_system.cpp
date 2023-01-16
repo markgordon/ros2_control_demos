@@ -28,6 +28,7 @@ namespace ros2_control_demo_hardware
 hardware_interface::CallbackReturn DiffBotSystemHardware::on_init(
   const hardware_interface::HardwareInfo & info)
 {
+  std::string port;
   if (
     hardware_interface::SystemInterface::on_init(info) !=
     hardware_interface::CallbackReturn::SUCCESS)
@@ -40,7 +41,7 @@ hardware_interface::CallbackReturn DiffBotSystemHardware::on_init(
   base_theta_ = 0.0;
 
   // BEGIN: This part here is for exemplary purposes - Please do not copy to your production code
-  hw_start_sec_ = std::stod(info_.hardware_parameters["example_param_hw_start_duration_sec"]);
+  port = info_.hardware_parameters["ddms_tty"];
   hw_stop_sec_ = std::stod(info_.hardware_parameters["example_param_hw_stop_duration_sec"]);
   // END: This part here is for exemplary purposes - Please do not copy to your production code
   hw_positions_.resize(info_.joints.size(), std::numeric_limits<double>::quiet_NaN());
@@ -95,6 +96,16 @@ hardware_interface::CallbackReturn DiffBotSystemHardware::on_init(
       return hardware_interface::CallbackReturn::ERROR;
     }
   }
+    RCLCPP_INFO(rclcpp::get_logger("DiffBotSystemHardware"), "open port");
+
+  port = "/dev/ttyACM0";
+  ddms_diff::return_type ret = wheel_command.open(port);
+  if(ret != ddms_diff::return_type::SUCCESS)
+  {
+    RCLCPP_FATAL(rclcpp::get_logger("DiffBotSystemHardware"),"Couldn't open port %s, code %i",port.c_str(),(int)ret);
+    return hardware_interface::CallbackReturn::ERROR;
+  }
+    RCLCPP_INFO(rclcpp::get_logger("DiffBotSystemHardware"), "port open");
 
   return hardware_interface::CallbackReturn::SUCCESS;
 }
@@ -128,17 +139,6 @@ std::vector<hardware_interface::CommandInterface> DiffBotSystemHardware::export_
 hardware_interface::CallbackReturn DiffBotSystemHardware::on_activate(
   const rclcpp_lifecycle::State & /*previous_state*/)
 {
-  // BEGIN: This part here is for exemplary purposes - Please do not copy to your production code
-  RCLCPP_INFO(rclcpp::get_logger("DiffBotSystemHardware"), "Activating ...please wait...");
-
-  for (auto i = 0; i < hw_start_sec_; i++)
-  {
-    rclcpp::sleep_for(std::chrono::seconds(1));
-    RCLCPP_INFO(
-      rclcpp::get_logger("DiffBotSystemHardware"), "%.1f seconds left...", hw_start_sec_ - i);
-  }
-  // END: This part here is for exemplary purposes - Please do not copy to your production code
-
   // set some default values
   for (auto i = 0u; i < hw_positions_.size(); i++)
   {
@@ -158,77 +158,47 @@ hardware_interface::CallbackReturn DiffBotSystemHardware::on_activate(
 hardware_interface::CallbackReturn DiffBotSystemHardware::on_deactivate(
   const rclcpp_lifecycle::State & /*previous_state*/)
 {
-  // BEGIN: This part here is for exemplary purposes - Please do not copy to your production code
-  RCLCPP_INFO(rclcpp::get_logger("DiffBotSystemHardware"), "Deactivating ...please wait...");
-
-  for (auto i = 0; i < hw_stop_sec_; i++)
-  {
-    rclcpp::sleep_for(std::chrono::seconds(1));
-    RCLCPP_INFO(
-      rclcpp::get_logger("DiffBotSystemHardware"), "%.1f seconds left...", hw_stop_sec_ - i);
-  }
-  // END: This part here is for exemplary purposes - Please do not copy to your production code
-
+  wheel_command.close();
   RCLCPP_INFO(rclcpp::get_logger("DiffBotSystemHardware"), "Successfully deactivated!");
 
   return hardware_interface::CallbackReturn::SUCCESS;
 }
 
 hardware_interface::return_type DiffBotSystemHardware::read(
-  const rclcpp::Time & /*time*/, const rclcpp::Duration & period)
+  const rclcpp::Time & /*time*/, const rclcpp::Duration & /*period*/)
 {
-  double radius = 0.02;  // radius of the wheels
-  double dist_w = 0.1;   // distance between the wheels
-  for (uint i = 0; i < hw_commands_.size(); i++)
-  {
-    // Simulate DiffBot wheels's movement as a first-order system
-    // Update the joint status: this is a revolute joint without any limit.
-    // Simply integrates
-    hw_positions_[i] = hw_positions_[1] + period.seconds() * hw_commands_[i];
-    hw_velocities_[i] = hw_commands_[i];
-
-    // BEGIN: This part here is for exemplary purposes - Please do not copy to your production code
+  //Ideally, re-set the velocity to what it is already on DDMS and get precision state
+  // Check velocity, though it should be constant
+  //update angle of wheel based on current encoder reading
+  
+  for(int i=0;i<1;i++){
+    std::vector<double> state = wheel_command.get_wheel_state(i,hw_velocities_[i]);
+    hw_velocities_[i] = state[0];
+    hw_positions_[i] = state[1];
     RCLCPP_INFO(
-      rclcpp::get_logger("DiffBotSystemHardware"),
-      "Got position state %.5f and velocity state %.5f for '%s'!", hw_positions_[i],
-      hw_velocities_[i], info_.joints[i].name.c_str());
-    // END: This part here is for exemplary purposes - Please do not copy to your production code
+    rclcpp::get_logger("DiffBotSystemHardware"), "Read joint %i, vel %f, pos %f",i,state[0],state[1]);
   }
-
-  // Update the free-flyer, i.e. the base notation using the classical
-  // wheel differentiable kinematics
-  double base_dx = 0.5 * radius * (hw_commands_[0] + hw_commands_[1]) * cos(base_theta_);
-  double base_dy = 0.5 * radius * (hw_commands_[0] + hw_commands_[1]) * sin(base_theta_);
-  double base_dtheta = radius * (hw_commands_[0] - hw_commands_[1]) / dist_w;
-  base_x_ += base_dx * period.seconds();
-  base_y_ += base_dy * period.seconds();
-  base_theta_ += base_dtheta * period.seconds();
-
-  // BEGIN: This part here is for exemplary purposes - Please do not copy to your production code
-  RCLCPP_INFO(
-    rclcpp::get_logger("DiffBotSystemHardware"), "Joints successfully read! (%.5f,%.5f,%.5f)",
-    base_x_, base_y_, base_theta_);
-  // END: This part here is for exemplary purposes - Please do not copy to your production code
-
   return hardware_interface::return_type::OK;
 }
 
 hardware_interface::return_type ros2_control_demo_hardware::DiffBotSystemHardware::write(
   const rclcpp::Time & /*time*/, const rclcpp::Duration & /*period*/)
 {
-  // BEGIN: This part here is for exemplary purposes - Please do not copy to your production code
-  RCLCPP_INFO(rclcpp::get_logger("DiffBotSystemHardware"), "Writing...");
-
+  ddms_diff::return_type retval;
+  //set velocity from command variable
   for (auto i = 0u; i < hw_commands_.size(); i++)
   {
-    // Simulate sending commands to the hardware
-    RCLCPP_INFO(
-      rclcpp::get_logger("DiffBotSystemHardware"), "Got command %.5f for '%s'!", hw_commands_[i],
-      info_.joints[i].name.c_str());
+    retval = wheel_command.motor_command(i,hw_commands_[i]);
+    if(retval != ddms_diff::return_type::SUCCESS) 
+      {
+          RCLCPP_ERROR(
+              rclcpp::get_logger("DiffBotSystemHardware"), "set velocity %i", (int)retval);
+        return hardware_interface::return_type::ERROR;
+      }
+    //since we are in a velocity control loop, this should be true until the value is changed
+    //ideally it would be double checked in a read, but if not this works well enough
+    hw_velocities_[i] = hw_commands_[i];
   }
-  RCLCPP_INFO(rclcpp::get_logger("DiffBotSystemHardware"), "Joints successfully written!");
-  // END: This part here is for exemplary purposes - Please do not copy to your production code
-
   return hardware_interface::return_type::OK;
 }
 

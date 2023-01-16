@@ -10,13 +10,17 @@
 
 namespace ddms_diff
 {
-    enum return_type : std::uint8_t
+    enum class return_type : std::int8_t
     {
         SUCCESS = 0,
         ERROR = -1,
-        MOTOR_ERROR = 1;
+        MOTOR_ERROR = 1,
     };
-
+    enum class Mode : uint8_t {
+        Current = 0x01,
+        Velocity = 0x02,
+        Position = 0x03,
+    }; 
     class DDMSSerial
     {
     public:
@@ -25,23 +29,18 @@ namespace ddms_diff
         
         return_type open(const std::string & port_name);
         return_type close();
-        return_type command_motor(uint8_t ID, uint16_t commanded_value);
+        return_type motor_command(uint8_t ID, double commanded_value);
+        std::vector<double> get_wheel_state(uint8_t ID,double velocity);
         return_type set_motor_control(uint8_t ID, Mode mode);
         bool is_open() const;
-        enum Mode : uint8_t {
-            Current = 0x01,
-            Velocity = 0x02,
-            Position = 0x03,
-        }; 
+
     protected:
-        void encode_byte(uint8_t data);
-        void decode_byte(uint8_t data, std::vector<SerialHdlcFrame>& frames);
         uint8_t crc_update(uint8_t * data, uint8_t len);
 
     private:
-        return_type read_frame(std::vector<SerialHdlcFrame>& frames);
-        return_type write_frame(const uint8_t* data, size_t size);
-        uint8_t crc_update(uint8_t* data);
+        return_type read_frame(uint8_t * frame);
+        return_type write_frame(uint8_t* data);
+        uint8_t crc_update(const uint8_t* data);
 
         int serial_port_;
         uint8_t rx_buffer_[DDMS_SERIAL_BUFFER_MAX_SIZE];
@@ -110,7 +109,7 @@ namespace ddms_diff
             uint8_t position[2];// 0-32767, 0-360 
             uint8_t error_code;// BIT: 0 - sensor, 1 - over current, 2 - phase current, 3 - stall, 4 - trouble
             uint8_t CRC;
-        } __attribute__((packed)) command_motor; 
+        } __attribute__((packed)) command_motor_reply; 
         //set motor control mode
         typedef struct set_mode {
             uint8_t ID;
