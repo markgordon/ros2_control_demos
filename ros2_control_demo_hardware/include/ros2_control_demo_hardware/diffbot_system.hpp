@@ -30,6 +30,7 @@
 #include "rclcpp_lifecycle/node_interfaces/lifecycle_node_interface.hpp"
 #include "rclcpp_lifecycle/state.hpp"
 #include "ros2_control_demo_hardware/visibility_control.h"
+#include "ddms_serial_port.hpp" //implements ddms wheel serial port control (rs485 bus with 2 ids)
 
 namespace ros2_control_demo_hardware
 {
@@ -68,6 +69,8 @@ private:
   // Parameters for the DiffBot simulation
   double hw_start_sec_;
   double hw_stop_sec_;
+  
+  ddms_diff::DDMSSerial wheel_command; //interface to send and receive data from wheels
 
   // Store the command for the simulated robot
   std::vector<double> hw_commands_;
