@@ -5,6 +5,7 @@
 #include <errno.h>
 #include <termios.h>
 #include <unistd.h>
+#include <sys/ioctl.h>
 #include <rclcpp/rclcpp.hpp>
 
 #include "ros2_control_demo_hardware/ddms_serial_port.hpp"
@@ -33,7 +34,8 @@ ddms_diff::return_type DDMSSerial::open(const std::string & port_name)
         fprintf(stderr, "Failed to open serial port: %s (%d)\n", strerror(errno), errno);
         return return_type::ERROR;
     }
-
+    //make it exclusive
+    ioctl(serial_port_, TIOCEXCL);
     struct termios tty_config{};
     if (::tcgetattr(serial_port_, &tty_config) != 0) {
         fprintf(stderr, "Failed to get serial port configuration: %s (%d)\n", strerror(errno), errno);
@@ -43,20 +45,16 @@ ddms_diff::return_type DDMSSerial::open(const std::string & port_name)
 
     memset(&tty_config, 0, sizeof(termios));
     tty_config.c_cflag = B115200 ;//| CRTSCTS | CS8 | CLOCAL | CREAD;
-    tty_config.c_iflag &= ~(INLCR | IGNCR | ICRNL | IXON | IXOFF);
-    tty_config.c_oflag &= ~(ONLCR | OCRNL);
-    tty_config.c_lflag &= ~(ECHO | ECHONL | ICANON | ISIG | IEXTEN);
-    tty_config.c_cc[VTIME] = 10;    // Wait for up to 1s (10 deciseconds), returning as soon as any data is received.
+    tty_config.c_cflag &= ~PARENB;//clear parity bit (no parity)
+    tty_config.c_cflag &= ~CSTOPB;//Stop bits = 1
+    tty_config.c_cflag &= ~CSIZE;//clears the mask
+    tty_config.c_cflag |= CS8; //set data bits = 8
+    tty_config.c_cflag &= ~CRTSCTS; //turn off hardwar based flow ctrl
+    tty_config.c_cflag |= CREAD | CLOCAL;//Turn on the reciever
+    tty_config.c_lflag &= ~(ICANON | ECHO | ECHOE | ISIG); 
+    tty_config.c_cc[VTIME] = 1;    // Wait for up to 1s (10 deciseconds), returning as soon as any data is received.
     tty_config.c_cc[VMIN] = 0;
     tcflush(serial_port_, TCIFLUSH);
-
-    /*
-    if (::cfsetispeed(&tty_config, B9600) != 0 || ::cfsetospeed(&tty_config, B9600) != 0) {
-        fprintf(stderr, "Failed to set serial port speed: %s (%d)\n", strerror(errno), errno);
-        close();
-        return return_type::ERROR;
-    }
-    */
 
     if (::tcsetattr(serial_port_, TCSANOW, &tty_config) != 0) {
         fprintf(stderr, "Failed to set serial port configuration: %s (%d)\n", strerror(errno), errno);
@@ -80,10 +78,12 @@ ddms_diff::return_type DDMSSerial::close()
 ddms_diff::return_type DDMSSerial::get_wheel_state(uint8_t ID,double velocity,std::vector<double> & states)
 {
     //write velocity to motor
+
     return_type retval = motor_command(ID,velocity);
 
     if(retval == return_type::SUCCESS){
         command_motor_reply reply;
+
         if((retval = read_frame((uint8_t * )(&reply))) == return_type::SUCCESS){
             //velocity 
             states.push_back(((reply.velocity[0] << 8 )+ reply.velocity[1])/(double)32767);
@@ -96,6 +96,8 @@ ddms_diff::return_type DDMSSerial::get_wheel_state(uint8_t ID,double velocity,st
         RCLCPP_ERROR(rclcpp::get_logger("DDMSSerialPort"), "Failed to read state ID:%i, error %i",ID,(uint)retval);
         return retval;
     }
+    //RCLCPP_INFO(rclcpp::get_logger("DDMSSerialPort"),"command %f %f", states[0],states[1]);
+
     return ddms_diff::return_type::SUCCESS;
 }
 return_type DDMSSerial::motor_command(uint8_t ID, double commanded_value)
@@ -114,19 +116,20 @@ return_type DDMSSerial::read_frame(uint8_t * frame)
 {
     // Read data from the serial port
     ssize_t num_bytes=0,retval=0;
-    uint8_t rx_buffer[20];
+    uint8_t rx_buffer[11];
+    //having some trouble here, dont' want to block but sometimes it doesn't seem to answer, so if we don't get 10 bytes, just dump out after a .2 seconds
+    uint tries=0;
     do{
-        retval = ::read(serial_port_, rx_buffer, 20);
+        retval = ::read(serial_port_, rx_buffer, 10-num_bytes);
+        if(retval > 0) memcpy(frame + num_bytes,rx_buffer,retval);
         num_bytes+= retval;
+        tries++;
+    }while(retval > -1 && num_bytes < 10 && tries < 2);
 
-    }while(retval > -1 && num_bytes < 10);
-
-    //if the port didn't respond (or incomplete) we have a problem
-    if (num_bytes < 10) {
+    if (retval == -1) {
         RCLCPP_ERROR(rclcpp::get_logger("DDMSSerialPort"),"Failed to read serial port data: %s (%d)\n", strerror(errno), errno);
         return return_type::ERROR;
     }
-    memcpy(frame,rx_buffer,10);
     return return_type::SUCCESS;
 }
 

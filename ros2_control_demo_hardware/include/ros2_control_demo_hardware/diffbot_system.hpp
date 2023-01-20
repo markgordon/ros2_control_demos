@@ -66,6 +66,10 @@ public:
     const rclcpp::Time & time, const rclcpp::Duration & period) override;
 
 private:
+
+  uint64_t MIN_INTERVAL_NS = 2500000;
+
+  std::chrono::nanoseconds last_query_nano;
   // Parameters for the DiffBot simulation
   double hw_start_sec_;
   double hw_stop_sec_;
