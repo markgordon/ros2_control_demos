@@ -6,7 +6,7 @@
 #include <vector>
 
 #define DDMS_SERIAL_BUFFER_MAX_SIZE       200
-#define DDMS_SERIAL_SERIAL_FRAME_SIZE     9
+#define DDMS_SERIAL_SERIAL_FRAME_SIZE     10
 
 namespace ddms_diff
 {
@@ -30,7 +30,7 @@ namespace ddms_diff
         return_type open(const std::string & port_name);
         return_type close();
         return_type motor_command(uint8_t ID, double commanded_value);
-        std::vector<double> get_wheel_state(uint8_t ID,double velocity);
+        ddms_diff::return_type get_wheel_state(uint8_t ID,double velocity,std::vector<double> & current_wheel_state);
         return_type set_motor_control(uint8_t ID, Mode mode);
         bool is_open() const;
 
@@ -43,7 +43,6 @@ namespace ddms_diff
         uint8_t crc_update(const uint8_t* data);
 
         int serial_port_;
-        uint8_t rx_buffer_[DDMS_SERIAL_BUFFER_MAX_SIZE];
         uint8_t rx_frame_buffer_[DDMS_SERIAL_SERIAL_FRAME_SIZE];
         size_t rx_frame_length_;
         uint16_t rx_frame_crc_;
@@ -66,7 +65,6 @@ namespace ddms_diff
         typedef struct interrogate_motor {
             uint8_t cmd1 = 0xC8;
             uint8_t cmd2 = 0x64;
-            uint8_t ID;
             uint8_t reserved[7] = {0};
             uint8_t CRC;
         } __attribute__((packed)) interrogate_motor;
@@ -75,7 +73,7 @@ namespace ddms_diff
         typedef struct get_motor_state {
             uint8_t ID;
             uint8_t cmd2 = 0x74;
-            uint8_t reserved[6] = {0};
+            uint8_t reserved[7] = {0};
             uint8_t CRC;
         } __attribute__((packed)) get_motor_state;
         //motor state return
@@ -95,8 +93,8 @@ namespace ddms_diff
             uint8_t command = 0x64;
             uint8_t commanded_state[2];//high bit first, this is velocity, current or position (-330 to 330, velocity, -32767~32767 - current, +/- 8A, 0-32767, position, 0-360)
             uint8_t res[2] = {0};
-            uint8_t acceleration_time; 
-            uint8_t brake;
+            uint8_t acceleration_time = 0; 
+            uint8_t brake = 0;
             uint8_t res1 = 0;
             uint8_t CRC;
         } __attribute__((packed)) command_motor;  

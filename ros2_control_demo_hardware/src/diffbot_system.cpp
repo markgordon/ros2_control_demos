@@ -98,20 +98,21 @@ hardware_interface::CallbackReturn DiffBotSystemHardware::on_init(
   }
     RCLCPP_INFO(rclcpp::get_logger("DiffBotSystemHardware"), "open port");
 
-  port = "/dev/ttyACM0";
+  port = "/dev/ttyUSB0";
   ddms_diff::return_type ret = wheel_command.open(port);
   if(ret != ddms_diff::return_type::SUCCESS)
   {
     RCLCPP_FATAL(rclcpp::get_logger("DiffBotSystemHardware"),"Couldn't open port %s, code %i",port.c_str(),(int)ret);
     return hardware_interface::CallbackReturn::ERROR;
   }
-    RCLCPP_INFO(rclcpp::get_logger("DiffBotSystemHardware"), "port open");
 
   return hardware_interface::CallbackReturn::SUCCESS;
 }
 
 std::vector<hardware_interface::StateInterface> DiffBotSystemHardware::export_state_interfaces()
 {
+    //RCLCPP_INFO(rclcpp::get_logger("DiffBotSystemHardware"), "export state");
+
   std::vector<hardware_interface::StateInterface> state_interfaces;
   for (auto i = 0u; i < info_.joints.size(); i++)
   {
@@ -126,6 +127,8 @@ std::vector<hardware_interface::StateInterface> DiffBotSystemHardware::export_st
 
 std::vector<hardware_interface::CommandInterface> DiffBotSystemHardware::export_command_interfaces()
 {
+    //RCLCPP_INFO(rclcpp::get_logger("DiffBotSystemHardware"), "export command");
+  
   std::vector<hardware_interface::CommandInterface> command_interfaces;
   for (auto i = 0u; i < info_.joints.size(); i++)
   {
@@ -139,6 +142,8 @@ std::vector<hardware_interface::CommandInterface> DiffBotSystemHardware::export_
 hardware_interface::CallbackReturn DiffBotSystemHardware::on_activate(
   const rclcpp_lifecycle::State & /*previous_state*/)
 {
+   // RCLCPP_INFO(rclcpp::get_logger("DiffBotSystemHardware"), "activate");
+
   // set some default values
   for (auto i = 0u; i < hw_positions_.size(); i++)
   {
@@ -150,7 +155,7 @@ hardware_interface::CallbackReturn DiffBotSystemHardware::on_activate(
     }
   }
 
-  RCLCPP_INFO(rclcpp::get_logger("DiffBotSystemHardware"), "Successfully activated!");
+  //RCLCPP_INFO(rclcpp::get_logger("DiffBotSystemHardware"), "Successfully activated!");
 
   return hardware_interface::CallbackReturn::SUCCESS;
 }
@@ -158,8 +163,10 @@ hardware_interface::CallbackReturn DiffBotSystemHardware::on_activate(
 hardware_interface::CallbackReturn DiffBotSystemHardware::on_deactivate(
   const rclcpp_lifecycle::State & /*previous_state*/)
 {
+    RCLCPP_INFO(rclcpp::get_logger("DiffBotSystemHardware"), "close port");
+
   wheel_command.close();
-  RCLCPP_INFO(rclcpp::get_logger("DiffBotSystemHardware"), "Successfully deactivated!");
+  //RCLCPP_INFO(rclcpp::get_logger("DiffBotSystemHardware"), "Successfully deactivated!");
 
   return hardware_interface::CallbackReturn::SUCCESS;
 }
@@ -170,13 +177,21 @@ hardware_interface::return_type DiffBotSystemHardware::read(
   //Ideally, re-set the velocity to what it is already on DDMS and get precision state
   // Check velocity, though it should be constant
   //update angle of wheel based on current encoder reading
+    //RCLCPP_INFO(rclcpp::get_logger("DiffBotSystemHardware"), "read interfaces");
   
-  for(int i=0;i<1;i++){
-    std::vector<double> state = wheel_command.get_wheel_state(i,hw_velocities_[i]);
-    hw_velocities_[i] = state[0];
-    hw_positions_[i] = state[1];
-    RCLCPP_INFO(
-    rclcpp::get_logger("DiffBotSystemHardware"), "Read joint %i, vel %f, pos %f",i,state[0],state[1]);
+  for(int i=1;i<3;i++){
+    std::vector<double> state;
+    ddms_diff::return_type retval = wheel_command.get_wheel_state(i,hw_velocities_[i],state);
+    if(retval != ddms_diff::return_type::SUCCESS){
+        return hardware_interface::return_type::ERROR;
+    }
+    //should always be 2 if no error, but just in case...
+    if(state.size() == 2){
+      hw_velocities_[i] = state[0];
+      hw_positions_[i] = state[1];
+    }
+   // RCLCPP_INFO(
+   //   rclcpp::get_logger("DiffBotSystemHardware"), "Read joint %i, vel %f, pos %f",i,state[0],state[1]);
   }
   return hardware_interface::return_type::OK;
 }
@@ -184,21 +199,32 @@ hardware_interface::return_type DiffBotSystemHardware::read(
 hardware_interface::return_type ros2_control_demo_hardware::DiffBotSystemHardware::write(
   const rclcpp::Time & /*time*/, const rclcpp::Duration & /*period*/)
 {
-  ddms_diff::return_type retval;
+  RCLCPP_INFO(rclcpp::get_logger("DiffBotSystemHardware"), "velocity %f %f",hw_commands_[0],hw_commands_[1]);
+
   //set velocity from command variable
   for (auto i = 0u; i < hw_commands_.size(); i++)
   {
-    retval = wheel_command.motor_command(i,hw_commands_[i]);
-    if(retval != ddms_diff::return_type::SUCCESS) 
-      {
-          RCLCPP_ERROR(
-              rclcpp::get_logger("DiffBotSystemHardware"), "set velocity %i", (int)retval);
+  //convert from m/s to rpm, which is (vel/PI*diameter) *60
+    double rpm = hw_commands_[i] * 60 / 0.322013247;
+    //max vel, just double checking to not blow out motors.
+    if (rpm < -110){
+      rpm = -110;
+      hw_commands_[i] = rpm * 0.322013247/60;
+    }
+    if (rpm > 110) {
+      rpm = 110;
+      hw_commands_[i] = rpm * 0.322013247/60;
+    }
+    std::vector<double> state;
+    ddms_diff::return_type retval = wheel_command.get_wheel_state(i+1,hw_commands_[i],state);
+    if(retval != ddms_diff::return_type::SUCCESS){
         return hardware_interface::return_type::ERROR;
-      }
+    }
     //since we are in a velocity control loop, this should be true until the value is changed
     //ideally it would be double checked in a read, but if not this works well enough
     hw_velocities_[i] = hw_commands_[i];
   }
+
   return hardware_interface::return_type::OK;
 }
 
