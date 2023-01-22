@@ -67,7 +67,7 @@ public:
 
 private:
 
-  uint64_t MIN_INTERVAL_NS = 2500000;
+  uint64_t MIN_INTERVAL_MS = 2.5;
 
   std::chrono::nanoseconds last_query_nano;
   // Parameters for the DiffBot simulation
@@ -80,6 +80,7 @@ private:
   std::vector<double> hw_commands_;
   std::vector<double> hw_positions_;
   std::vector<double> hw_velocities_;
+  std::vector<double> last_hw_commands_;
 
   // Store the wheeled robot position
   double base_x_, base_y_, base_theta_;

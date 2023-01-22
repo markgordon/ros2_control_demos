@@ -86,9 +86,15 @@ ddms_diff::return_type DDMSSerial::get_wheel_state(uint8_t ID,double velocity,st
 
         if((retval = read_frame((uint8_t * )(&reply))) == return_type::SUCCESS){
             //velocity 
-            states.push_back(((reply.velocity[0] << 8 )+ reply.velocity[1])/(double)32767);
             //position
-            states.push_back((((reply.position[0] << 8) + reply.position[1])/(double)32767 )* 2* M_PI);
+            if(ID==0){
+                states.push_back(-((reply.velocity[0] << 8 )+ reply.velocity[1])/(double)32767);
+                int pos = 32767 - ((reply.position[0] << 8) + reply.position[1]);
+                states.push_back((pos/(double)32767 )* 2* M_PI);
+            }else{
+                states.push_back(((reply.velocity[0] << 8 )+ reply.velocity[1])/(double)32767);
+                states.push_back((((reply.position[0] << 8) + reply.position[1])/(double)32767 )* 2* M_PI);
+            }
         }else{
             return retval;
         }
