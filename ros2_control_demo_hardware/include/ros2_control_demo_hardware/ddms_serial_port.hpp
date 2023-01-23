@@ -6,7 +6,7 @@
 #include <vector>
 
 #define DDMS_SERIAL_BUFFER_MAX_SIZE       200
-#define DDMS_SERIAL_SERIAL_FRAME_SIZE     10
+#define DDSM_SERIAL_FRAME_SIZE     10
 
 namespace ddms_diff
 {
@@ -43,11 +43,11 @@ namespace ddms_diff
         uint8_t crc_update(const uint8_t* data);
 
         int serial_port_;
-        uint8_t rx_frame_buffer_[DDMS_SERIAL_SERIAL_FRAME_SIZE];
+        uint8_t rx_frame_buffer_[DDSM_SERIAL_FRAME_SIZE];
         size_t rx_frame_length_;
         uint16_t rx_frame_crc_;
         bool rx_frame_escape_;
-        uint8_t tx_frame_buffer_[DDMS_SERIAL_SERIAL_FRAME_SIZE];
+        uint8_t tx_frame_buffer_[DDSM_SERIAL_FRAME_SIZE];
         size_t tx_frame_length_;
         uint16_t tx_frame_crc_;
         //Motor serial command structures and values

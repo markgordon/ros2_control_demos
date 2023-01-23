@@ -87,12 +87,18 @@ ddms_diff::return_type DDMSSerial::get_wheel_state(uint8_t ID,double velocity,st
         if((retval = read_frame((uint8_t * )(&reply))) == return_type::SUCCESS){
             //velocity 
             //position
-            if(ID==0){
-                states.push_back(-((reply.velocity[0] << 8 )+ reply.velocity[1])/(double)32767);
-                int pos = 32767 - ((reply.position[0] << 8) + reply.position[1]);
+            if(ID==1){
+                int vel = (reply.velocity[0] << 8 )+ reply.velocity[1];//+- 32767, valid from 330 to -330
+                if(vel !=0) RCLCPP_INFO(rclcpp::get_logger("DDMSSerialPort"),"id 1 %i", vel);
+
+                states.push_back(-vel);
+                //the opposite rotation
+                int pos = 32767 - ((int)(reply.position[0] << 8) + reply.position[1]);
                 states.push_back((pos/(double)32767 )* 2* M_PI);
             }else{
-                states.push_back(((reply.velocity[0] << 8 )+ reply.velocity[1])/(double)32767);
+                int vel = (reply.velocity[0] << 8 )+ reply.velocity[1];//+- 32767, valid from 330 to -330
+                if(vel !=0) RCLCPP_INFO(rclcpp::get_logger("DDMSSerialPort"),"id 0 %i", vel);
+                states.push_back(vel);
                 states.push_back((((reply.position[0] << 8) + reply.position[1])/(double)32767 )* 2* M_PI);
             }
         }else{
@@ -111,7 +117,8 @@ return_type DDMSSerial::motor_command(uint8_t ID, double commanded_value)
     //write velocity to motor
     command_motor command;
     command.ID = ID;
-    int16_t integer_velocity = (int)32767/commanded_value;
+    //ugly, but it only supports integer RPMs
+    int16_t integer_velocity = (int)round(commanded_value);
     command.commanded_state[0] = integer_velocity >>8;
     command.commanded_state[1] = integer_velocity;
     //RCLCPP_INFO(rclcpp::get_logger("DDMSSerialPort"),"command %d %d %d", command.ID,command.commanded_state[0],command.commanded_state[1]);
@@ -126,16 +133,23 @@ return_type DDMSSerial::read_frame(uint8_t * frame)
     //having some trouble here, dont' want to block but sometimes it doesn't seem to answer, so if we don't get 10 bytes, just dump out after a .2 seconds
     uint tries=0;
     do{
-        retval = ::read(serial_port_, rx_buffer, 10-num_bytes);
+        retval = ::read(serial_port_, rx_buffer, 10);
         if(retval > 0) memcpy(frame + num_bytes,rx_buffer,retval);
         num_bytes+= retval;
         tries++;
-    }while(retval > -1 && num_bytes < 10 && tries < 2);
-
-    if (retval == -1) {
+    }while(retval > -1 && num_bytes < 10 );
+    /*if(num_bytes == 10){
+        RCLCPP_INFO(rclcpp::get_logger("DDMSSerialPort"),"answer %02x%02x%02x%02x%02x%02x%02x%02x%02x %02x",
+        frame[0],
+        frame[1],frame[2],frame[3],frame[4],frame[5],frame[6],frame[7],frame[8],frame[9]);
+    }*/
+    if (retval == -1 ) {
         RCLCPP_ERROR(rclcpp::get_logger("DDMSSerialPort"),"Failed to read serial port data: %s (%d)\n", strerror(errno), errno);
         return return_type::ERROR;
     }
+    //if(crc_update((uint8_t *)&frame) != frame[DDSM_SERIAL_FRAME_SIZE-1]){
+    //    RCLCPP_ERROR(rclcpp::get_logger("DDMSSerialPort"),"CRC fail exp %d  act %d)\n", crc_update((uint8_t *)&frame), frame[DDSM_SERIAL_FRAME_SIZE-1]);
+    //}
     return return_type::SUCCESS;
 }
 
@@ -148,8 +162,8 @@ ddms_diff::return_type DDMSSerial::write_frame(uint8_t* data)
     
     // Generate the frame
     uint8_t crc = crc_update(data);
-    data[DDMS_SERIAL_SERIAL_FRAME_SIZE -1] = crc;
-    if (::write(serial_port_, data, DDMS_SERIAL_SERIAL_FRAME_SIZE) == -1) {
+    data[DDSM_SERIAL_FRAME_SIZE -1] = crc;
+    if (::write(serial_port_, data, DDSM_SERIAL_FRAME_SIZE) == -1) {
         RCLCPP_ERROR(rclcpp::get_logger("DDMSSerialPort"),"Failed to write serial port data: %s (%d)\n", strerror(errno), errno);
         return return_type::ERROR;
     }
@@ -166,7 +180,7 @@ bool DDMSSerial::is_open() const
 uint8_t DDMSSerial::crc_update(const uint8_t* data)
 {
     unsigned crc = 0;
-    for (size_t i = 0; i < DDMS_SERIAL_SERIAL_FRAME_SIZE-1; i++) {
+    for (size_t i = 0; i < DDSM_SERIAL_FRAME_SIZE-1; i++) {
         crc ^= data[i];
         for (unsigned k = 0; k < 8; k++)
             crc = crc & 1 ? (crc >> 1) ^ 0x8c : crc >> 1;

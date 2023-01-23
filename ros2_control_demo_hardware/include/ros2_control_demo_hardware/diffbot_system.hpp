@@ -67,21 +67,21 @@ public:
 
 private:
 
-  uint64_t MIN_INTERVAL_MS = 2.5;
+  uint64_t MIN_INTERVAL_NS = 2500000;
 
-  std::chrono::nanoseconds last_query_nano;
+  std::chrono::nanoseconds last_query_nano_;
   // Parameters for the DiffBot simulation
   double hw_start_sec_;
   double hw_stop_sec_;
   
-  ddms_diff::DDMSSerial wheel_command; //interface to send and receive data from wheels
-
+  ddms_diff::DDMSSerial wheel_command[2]; //interface to send and receive data from wheels
   // Store the command for the simulated robot
   std::vector<double> hw_commands_;
   std::vector<double> hw_positions_;
   std::vector<double> hw_velocities_;
   std::vector<double> last_hw_commands_;
-
+  //wheel speed in RPM
+  double rpm_[2]={0};
   // Store the wheeled robot position
   double base_x_, base_y_, base_theta_;
 };
