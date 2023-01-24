@@ -67,7 +67,7 @@ public:
 
 private:
 
-  uint64_t MIN_INTERVAL_NS = 2500000;
+  uint64_t MIN_INTERVAL_NS = 8000000;//actually 125 hz, but lets leave some room for spec optimism
 
   std::chrono::nanoseconds last_query_nano_;
   // Parameters for the DiffBot simulation

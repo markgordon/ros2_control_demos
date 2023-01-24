@@ -154,7 +154,7 @@ std::vector<hardware_interface::CommandInterface> DiffBotSystemHardware::export_
 hardware_interface::CallbackReturn DiffBotSystemHardware::on_activate(
   const rclcpp_lifecycle::State & /*previous_state*/)
 {
-    RCLCPP_INFO(rclcpp::get_logger("DiffBotSystemHardware"), "activate");
+    //RCLCPP_INFO(rclcpp::get_logger("DiffBotSystemHardware"), "activate");
 
   // set some default values
   for (auto i = 0u; i < hw_positions_.size(); i++)
@@ -175,7 +175,7 @@ hardware_interface::CallbackReturn DiffBotSystemHardware::on_activate(
 hardware_interface::CallbackReturn DiffBotSystemHardware::on_deactivate(
   const rclcpp_lifecycle::State & /*previous_state*/)
 {
-    RCLCPP_INFO(rclcpp::get_logger("DiffBotSystemHardware"), "close port");
+   // RCLCPP_INFO(rclcpp::get_logger("DiffBotSystemHardware"), "close port");
 
   wheel_command[0].close();
   wheel_command[1].close();
@@ -189,11 +189,9 @@ hardware_interface::return_type DiffBotSystemHardware::read(
 {
   //required to send an RPM to get precision encoder info, so reuse latest rpm
   //update angle of wheel based on current (absolute) encoder reading
-
-  //max query rate for wheels is 500 hz, lets do 400 just to be on the safe side
-  uint64_t ms =   std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::system_clock().now().time_since_epoch() - last_query_nano_).count();
-  if(ms < MIN_INTERVAL_NS) {
-    RCLCPP_INFO(rclcpp::get_logger("DiffBotSystemHardware"), "Update Rate too high, skipping");
+  uint ns =   std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::system_clock().now().time_since_epoch() - last_query_nano_).count();
+  if(ns < MIN_INTERVAL_NS) {
+    //RCLCPP_INFO(rclcpp::get_logger("DiffBotSystemHardware"), "Read Rate too high, skipping");
     return hardware_interface::return_type::OK;
   } 
   last_query_nano_ = std::chrono::system_clock().now().time_since_epoch();
@@ -205,13 +203,16 @@ hardware_interface::return_type DiffBotSystemHardware::read(
     if(retval != ddms_diff::return_type::SUCCESS){
       RCLCPP_ERROR(
       rclcpp::get_logger("DiffBotSystemHardware"), "Read joint fail");
-        return hardware_interface::return_type::ERROR;
+       return hardware_interface::return_type::ERROR;
     }
-    hw_velocities_[i] = state[0];
-    hw_positions_[i] = state[1];
-    if(hw_velocities_[i] !=0) 
-    RCLCPP_INFO(
-      rclcpp::get_logger("DiffBotSystemHardware"), "Read joint %i, vel %f, pos %f",i,state[0],state[1]);
+    //states may be empty if their was a non-fatal read error
+    if(state.size() > 1){
+      hw_velocities_[i] = state[0];
+      hw_positions_[i] = state[1];
+    }
+   // if(hw_velocities_[i] !=0) 
+   // RCLCPP_INFO(
+   //   rclcpp::get_logger("DiffBotSystemHardware"), "Read joint %i, vel %f, pos %f",i,state[0],state[1]);
   }
   return hardware_interface::return_type::OK;
 }
@@ -219,29 +220,29 @@ hardware_interface::return_type DiffBotSystemHardware::read(
 hardware_interface::return_type ros2_control_demo_hardware::DiffBotSystemHardware::write(
   const rclcpp::Time & /*time*/, const rclcpp::Duration & /*period*/)
 {
-    //max query rate for wheels is 500 hz, lets do 400 just to be on the safe side
-  uint64_t ms =   std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::system_clock().now().time_since_epoch() - last_query_nano_).count();
-  if(ms < MIN_INTERVAL_NS) {
-    RCLCPP_INFO(rclcpp::get_logger("DiffBotSystemHardware"), "Update Rate too high, skipping");
+
+  uint ns =   std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::system_clock().now().time_since_epoch() - last_query_nano_).count();
+  if(ns < MIN_INTERVAL_NS) {
+    //RCLCPP_INFO(rclcpp::get_logger("DiffBotSystemHardware"), "Write Rate too high, skipping");
     return hardware_interface::return_type::OK;
   } 
   last_query_nano_ = std::chrono::system_clock().now().time_since_epoch();
-    //update to actual velocities (the right wheel is reversed, so flip direction of rotation)
+  //update to actual velocities (the right wheel is reversed, so flip direction of rotation)
+ if((hw_commands_[0] !=0 || hw_commands_[1] !=0 ) && (last_hw_commands_[0] != hw_commands_[0] && last_hw_commands_[1] != -hw_commands_[1])){
+    //RCLCPP_INFO(rclcpp::get_logger("DiffBotSystemHardware"), "velocity %f %f",hw_commands_[0],hw_commands_[1]);
+  }
   last_hw_commands_[0] = hw_commands_[0];
   last_hw_commands_[1] = -hw_commands_[1];
-  if(hw_commands_[0] !=0 || hw_commands_[1] !=0)
-  RCLCPP_INFO(rclcpp::get_logger("DiffBotSystemHardware"), "velocity %f %f, time %ld",hw_commands_[0],hw_commands_[1],
-    ms);
-  //set velocity from command variable
+   //set velocity from command variable
   for (auto i = 0u; i < hw_commands_.size(); i++)
   {
     std::vector<double> state;
     ddms_diff::return_type retval = wheel_command[i].get_wheel_state(i+1,last_hw_commands_[i],state);
-    if(retval != ddms_diff::return_type::SUCCESS){
-        return hardware_interface::return_type::ERROR;
+    if(retval != ddms_diff::return_type::SUCCESS)
+    {
+       return hardware_interface::return_type::ERROR;
     }
   }
-
   return hardware_interface::return_type::OK;
 }
 

@@ -5,7 +5,8 @@
 #include <errno.h>
 #include <termios.h>
 #include <unistd.h>
-#include <sys/ioctl.h>
+#include <sys/ioctl.h> 
+#include <linux/serial.h>
 #include <rclcpp/rclcpp.hpp>
 
 #include "ros2_control_demo_hardware/ddms_serial_port.hpp"
@@ -36,6 +37,11 @@ ddms_diff::return_type DDMSSerial::open(const std::string & port_name)
     }
     //make it exclusive
     ioctl(serial_port_, TIOCEXCL);
+    //make it low latency so it returns much faster
+    struct serial_struct serial;
+    ioctl(serial_port_, TIOCGSERIAL, &serial); 
+    serial.flags |= ASYNC_LOW_LATENCY; // (0x2000)
+    ioctl(serial_port_, TIOCSSERIAL, &serial);
     struct termios tty_config{};
     if (::tcgetattr(serial_port_, &tty_config) != 0) {
         fprintf(stderr, "Failed to get serial port configuration: %s (%d)\n", strerror(errno), errno);
@@ -78,37 +84,42 @@ ddms_diff::return_type DDMSSerial::close()
 ddms_diff::return_type DDMSSerial::get_wheel_state(uint8_t ID,double velocity,std::vector<double> & states)
 {
     //write velocity to motor
-
     return_type retval = motor_command(ID,velocity);
-
     if(retval == return_type::SUCCESS){
         command_motor_reply reply;
-
         if((retval = read_frame((uint8_t * )(&reply))) == return_type::SUCCESS){
-            //velocity 
-            //position
-            if(ID==1){
-                int vel = (reply.velocity[0] << 8 )+ reply.velocity[1];//+- 32767, valid from 330 to -330
-                if(vel !=0) RCLCPP_INFO(rclcpp::get_logger("DDMSSerialPort"),"id 1 %i", vel);
+            //rotation only goes to 32767, no negatives so conversion isn't an issue, just convert to radians
+            //veclocities are +/- so some ugliness
+            int32_t velocity = 0;            
+            //check for negative bit
 
-                states.push_back(-vel);
+            if(reply.velocity[0] == 255){
+                velocity = 255 - reply.velocity[1] +1;//convert to positive value
+
+            }else velocity = reply.velocity[1];
+                //RCLCPP_INFO(rclcpp::get_logger("DiffBotSystemHardware"), "read %d %i",ID, velocity);
+
+            if(ID==1){
+                states.push_back(-velocity);
                 //the opposite rotation
                 int pos = 32767 - ((int)(reply.position[0] << 8) + reply.position[1]);
                 states.push_back((pos/(double)32767 )* 2* M_PI);
             }else{
-                int vel = (reply.velocity[0] << 8 )+ reply.velocity[1];//+- 32767, valid from 330 to -330
-                if(vel !=0) RCLCPP_INFO(rclcpp::get_logger("DDMSSerialPort"),"id 0 %i", vel);
-                states.push_back(vel);
+                states.push_back(velocity);
                 states.push_back((((reply.position[0] << 8) + reply.position[1])/(double)32767 )* 2* M_PI);
             }
         }else{
+            if(retval == return_type::NON_FATAL_READ_ERROR) {
+                return ddms_diff::return_type::SUCCESS;
+            }
+            RCLCPP_ERROR(rclcpp::get_logger("DDMSSerialPort"), "Failed to read state ID:%i, error %i",ID,(uint)retval);
             return retval;
         }
     }else{
-        RCLCPP_ERROR(rclcpp::get_logger("DDMSSerialPort"), "Failed to read state ID:%i, error %i",ID,(uint)retval);
+
+        RCLCPP_ERROR(rclcpp::get_logger("DDMSSerialPort"), "Failed to send command ID:%i, error %i",ID,(uint)retval);
         return retval;
     }
-    //RCLCPP_INFO(rclcpp::get_logger("DDMSSerialPort"),"command %f %f", states[0],states[1]);
 
     return ddms_diff::return_type::SUCCESS;
 }
@@ -117,11 +128,10 @@ return_type DDMSSerial::motor_command(uint8_t ID, double commanded_value)
     //write velocity to motor
     command_motor command;
     command.ID = ID;
-    //ugly, but it only supports integer RPMs
-    int16_t integer_velocity = (int)round(commanded_value);
+    // only supports integer RPMs
+    uint16_t integer_velocity = (int16_t)round(commanded_value);
     command.commanded_state[0] = integer_velocity >>8;
     command.commanded_state[1] = integer_velocity;
-    //RCLCPP_INFO(rclcpp::get_logger("DDMSSerialPort"),"command %d %d %d", command.ID,command.commanded_state[0],command.commanded_state[1]);
 
     return write_frame((uint8_t *)(&command));
 }
@@ -130,23 +140,41 @@ return_type DDMSSerial::read_frame(uint8_t * frame)
     // Read data from the serial port
     ssize_t num_bytes=0,retval=0;
     uint8_t rx_buffer[11];
-    //having some trouble here, dont' want to block but sometimes it doesn't seem to answer, so if we don't get 10 bytes, just dump out after a .2 seconds
     uint tries=0;
+    auto start =  std::chrono::system_clock().now().time_since_epoch();
     do{
         retval = ::read(serial_port_, rx_buffer, 10);
         if(retval > 0) memcpy(frame + num_bytes,rx_buffer,retval);
         num_bytes+= retval;
         tries++;
+      //if we get nine bytes, we get nine bytes. 10 is never showing. If the first two bytes are good the rest are good as well
+      // as far as possible to tell.
+        if(num_bytes == 9){
+            //so if we wait just a few milliseconds the next call won't fail.......
+            //RCLCPP_INFO(rclcpp::get_logger("DDMSSerialPort"),"ppp");
+            if(tries > 1 || frame[0] > 2)
+            {
+                uint time =   std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::system_clock().now().time_since_epoch() - start).count();
+                RCLCPP_INFO(rclcpp::get_logger("DDMSSerialPort"),"fail time %d, %d, %d",time, tries,frame[0]);
+
+                RCLCPP_ERROR(rclcpp::get_logger("DDMSSerialPort"),"Failed to read serial port data bytes rec %d",num_bytes);
+                if(num_bytes > 0) return return_type::NON_FATAL_READ_ERROR;
+                if (retval == -1 ) {
+                    RCLCPP_ERROR(rclcpp::get_logger("DDMSSerialPort"),"Failed to read serial port data: %s (%ld)\n", strerror(errno), errno);
+                }
+                return return_type::ERROR;
+            }
+        }
     }while(retval > -1 && num_bytes < 10 );
-    /*if(num_bytes == 10){
-        RCLCPP_INFO(rclcpp::get_logger("DDMSSerialPort"),"answer %02x%02x%02x%02x%02x%02x%02x%02x%02x %02x",
-        frame[0],
-        frame[1],frame[2],frame[3],frame[4],frame[5],frame[6],frame[7],frame[8],frame[9]);
-    }*/
+                //RCLCPP_INFO(rclcpp::get_logger("DDMSSerialPort"),"answer %02x%02x%02x%02x%02x%02x%02x%02x%02x %02x",
+                //frame[0],frame[1],frame[2],frame[3],frame[4],frame[5],frame[6],frame[7],frame[8], frame[9]);
     if (retval == -1 ) {
         RCLCPP_ERROR(rclcpp::get_logger("DDMSSerialPort"),"Failed to read serial port data: %s (%d)\n", strerror(errno), errno);
         return return_type::ERROR;
     }
+    uint time =   std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::system_clock().now().time_since_epoch() - start).count();
+    //if(time > 20000000)
+        //RCLCPP_INFO(rclcpp::get_logger("DDMSSerialPort"),"time %d",time);
     //if(crc_update((uint8_t *)&frame) != frame[DDSM_SERIAL_FRAME_SIZE-1]){
     //    RCLCPP_ERROR(rclcpp::get_logger("DDMSSerialPort"),"CRC fail exp %d  act %d)\n", crc_update((uint8_t *)&frame), frame[DDSM_SERIAL_FRAME_SIZE-1]);
     //}
@@ -167,7 +195,6 @@ ddms_diff::return_type DDMSSerial::write_frame(uint8_t* data)
         RCLCPP_ERROR(rclcpp::get_logger("DDMSSerialPort"),"Failed to write serial port data: %s (%d)\n", strerror(errno), errno);
         return return_type::ERROR;
     }
-
     return return_type::SUCCESS;
 }
 

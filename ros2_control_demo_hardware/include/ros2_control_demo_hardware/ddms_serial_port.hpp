@@ -14,6 +14,7 @@ namespace ddms_diff
     {
         SUCCESS = 0,
         ERROR = -1,
+        NON_FATAL_READ_ERROR = -2,
         MOTOR_ERROR = 1,
     };
     enum class Mode : uint8_t {
@@ -41,7 +42,7 @@ namespace ddms_diff
         return_type read_frame(uint8_t * frame);
         return_type write_frame(uint8_t* data);
         uint8_t crc_update(const uint8_t* data);
-
+        
         int serial_port_;
         uint8_t rx_frame_buffer_[DDSM_SERIAL_FRAME_SIZE];
         size_t rx_frame_length_;
