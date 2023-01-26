@@ -65,21 +65,24 @@ public:
   hardware_interface::return_type write(
     const rclcpp::Time & time, const rclcpp::Duration & period) override;
 
-private:
+protected:
 
-  uint64_t MIN_INTERVAL_NS = 8000000;//actually 125 hz, but lets leave some room for spec optimism
+  uint64_t MIN_INTERVAL_NS = 9000000;//actually 125 hz, but lets leave some room for spec optimism
 
   std::chrono::nanoseconds last_query_nano_;
   // Parameters for the DiffBot simulation
   double hw_start_sec_;
   double hw_stop_sec_;
   
+  double last_angle_[2] = {-1,-1};
   ddms_diff::DDMSSerial wheel_command[2]; //interface to send and receive data from wheels
   // Store the command for the simulated robot
   std::vector<double> hw_commands_;
   std::vector<double> hw_positions_;
   std::vector<double> hw_velocities_;
   std::vector<double> last_hw_commands_;
+  std::vector<double> current_wheel_position_;
+  double last_state_[2][2] = {0,0};
   //wheel speed in RPM
   double rpm_[2]={0};
   // Store the wheeled robot position

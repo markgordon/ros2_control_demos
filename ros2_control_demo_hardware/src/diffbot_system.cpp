@@ -50,6 +50,9 @@ hardware_interface::CallbackReturn DiffBotSystemHardware::on_init(
   hw_velocities_.resize(info_.joints.size(), std::numeric_limits<double>::quiet_NaN());
   hw_commands_.resize(info_.joints.size(), std::numeric_limits<double>::quiet_NaN());
   last_hw_commands_.resize(info_.joints.size(), std::numeric_limits<double>::quiet_NaN());
+  current_wheel_position_.resize(info_.joints.size(), std::numeric_limits<double>::quiet_NaN());
+  current_wheel_position_[0] = 0;
+  current_wheel_position_[1] = 0;
 
   for (const hardware_interface::ComponentInfo & joint : info_.joints)
   {
@@ -187,14 +190,6 @@ hardware_interface::CallbackReturn DiffBotSystemHardware::on_deactivate(
 hardware_interface::return_type DiffBotSystemHardware::read(
   const rclcpp::Time & /*time*/, const rclcpp::Duration & /*period*/)
 {
-  //required to send an RPM to get precision encoder info, so reuse latest rpm
-  //update angle of wheel based on current (absolute) encoder reading
-  uint ns =   std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::system_clock().now().time_since_epoch() - last_query_nano_).count();
-  if(ns < MIN_INTERVAL_NS) {
-    //RCLCPP_INFO(rclcpp::get_logger("DiffBotSystemHardware"), "Read Rate too high, skipping");
-    return hardware_interface::return_type::OK;
-  } 
-  last_query_nano_ = std::chrono::system_clock().now().time_since_epoch();
 
   for(int i=0;i<2;i++){
     std::vector<double> state;
@@ -205,14 +200,41 @@ hardware_interface::return_type DiffBotSystemHardware::read(
       rclcpp::get_logger("DiffBotSystemHardware"), "Read joint fail");
        return hardware_interface::return_type::ERROR;
     }
-    //states may be empty if their was a non-fatal read error
+    //states may be empty if there was a non-fatal read error
     if(state.size() > 1){
+      //if this is first measurement the wheels are at starting position
+      if(last_angle_[i] == -1)last_angle_[i] = round(state[1]*1000)/1000.0;
+      else{
+          if(round(state[0]) !=0){
+            //create absolute encoder from relative
+            state[1] = round(state[1]*1000)/1000.0;
+            double delta=state[1] - last_angle_[i];
+            //rotating backwards over last interval
+            if(state[0] < 0){
+              if (last_angle_[i] - state[1] < -M_PI){
+                delta = -(2*M_PI - state[1] + last_angle_[i]);
+              }
+            }else if(state[0] > 0){
+              if (last_angle_[i] - state[1] > M_PI){
+                delta = round((2*M_PI - last_angle_[i] + state[1])*1000)/1000.0;
+              }
+            }
+            RCLCPP_INFO(rclcpp::get_logger("DiffBotSystemHardware"), "id %d last %f :current %f sp %f",i,last_angle_[i] ,state[1],state[0],delta);
+
+            current_wheel_position_[i]+=delta;
+          }
+          last_angle_[i] = state[1];
+
+      }
+      RCLCPP_INFO(rclcpp::get_logger("DiffBotSystemHardware"), "pos %f",current_wheel_position_[i]);
+
       hw_velocities_[i] = state[0];
-      hw_positions_[i] = state[1];
+      hw_positions_[i] = current_wheel_position_[i];
+      last_state_[i][0] = state[0];
+      last_state_[i][1] = state[1];
+    }else{
+      hw_positions_[i] = current_wheel_position_[i];
     }
-   // if(hw_velocities_[i] !=0) 
-   // RCLCPP_INFO(
-   //   rclcpp::get_logger("DiffBotSystemHardware"), "Read joint %i, vel %f, pos %f",i,state[0],state[1]);
   }
   return hardware_interface::return_type::OK;
 }
@@ -220,29 +242,8 @@ hardware_interface::return_type DiffBotSystemHardware::read(
 hardware_interface::return_type ros2_control_demo_hardware::DiffBotSystemHardware::write(
   const rclcpp::Time & /*time*/, const rclcpp::Duration & /*period*/)
 {
-
-  uint ns =   std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::system_clock().now().time_since_epoch() - last_query_nano_).count();
-  if(ns < MIN_INTERVAL_NS) {
-    //RCLCPP_INFO(rclcpp::get_logger("DiffBotSystemHardware"), "Write Rate too high, skipping");
-    return hardware_interface::return_type::OK;
-  } 
-  last_query_nano_ = std::chrono::system_clock().now().time_since_epoch();
-  //update to actual velocities (the right wheel is reversed, so flip direction of rotation)
- if((hw_commands_[0] !=0 || hw_commands_[1] !=0 ) && (last_hw_commands_[0] != hw_commands_[0] && last_hw_commands_[1] != -hw_commands_[1])){
-    //RCLCPP_INFO(rclcpp::get_logger("DiffBotSystemHardware"), "velocity %f %f",hw_commands_[0],hw_commands_[1]);
-  }
   last_hw_commands_[0] = hw_commands_[0];
   last_hw_commands_[1] = -hw_commands_[1];
-   //set velocity from command variable
-  for (auto i = 0u; i < hw_commands_.size(); i++)
-  {
-    std::vector<double> state;
-    ddms_diff::return_type retval = wheel_command[i].get_wheel_state(i+1,last_hw_commands_[i],state);
-    if(retval != ddms_diff::return_type::SUCCESS)
-    {
-       return hardware_interface::return_type::ERROR;
-    }
-  }
   return hardware_interface::return_type::OK;
 }
 
