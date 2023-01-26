@@ -90,23 +90,16 @@ ddms_diff::return_type DDMSSerial::get_wheel_state(uint8_t ID,double velocity,st
         if((retval = read_frame((uint8_t * )(&reply))) == return_type::SUCCESS){
             //rotation only goes to 32767, no negatives so conversion isn't an issue, just convert to radians
             //veclocities are +/- so some ugliness
-            int32_t velocity = 0;            
-            //check for negative bit
-
-            if(reply.velocity[0] == 255){
-                velocity = 255 - reply.velocity[1] +1;//convert to positive value
-
-            }else velocity = reply.velocity[1];
-                //RCLCPP_INFO(rclcpp::get_logger("DiffBotSystemHardware"), "read %d %i",ID, velocity);
-
-            if(ID==1){
+            int16_t velocity = (reply.velocity[0]<<8) | reply.velocity[1];            
+            if(ID==2){
                 states.push_back(-velocity);
                 //the opposite rotation
-                int pos = 32767 - ((int)(reply.position[0] << 8) + reply.position[1]);
-                states.push_back((pos/(double)32767 )* 2* M_PI);
+                states.push_back((((reply.position[0] << 8) + reply.position[1])/(double)32767 )* 2* M_PI);
+
             }else{
                 states.push_back(velocity);
-                states.push_back((((reply.position[0] << 8) + reply.position[1])/(double)32767 )* 2* M_PI);
+                int pos = 32767 - ((uint32_t)(reply.position[0] << 8) + reply.position[1]);
+                states.push_back((pos/(double)32767 )* 2* M_PI);
             }
         }else{
             if(retval == return_type::NON_FATAL_READ_ERROR) {
@@ -157,7 +150,7 @@ return_type DDMSSerial::read_frame(uint8_t * frame)
                 uint time =   std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::system_clock().now().time_since_epoch() - start).count();
                 RCLCPP_INFO(rclcpp::get_logger("DDMSSerialPort"),"fail time %d, %d, %d",time, tries,frame[0]);
 
-                RCLCPP_ERROR(rclcpp::get_logger("DDMSSerialPort"),"Failed to read serial port data bytes rec %d",num_bytes);
+                RCLCPP_ERROR(rclcpp::get_logger("DDMSSerialPort"),"rec %d",num_bytes);
                 if(num_bytes > 0) return return_type::NON_FATAL_READ_ERROR;
                 if (retval == -1 ) {
                     RCLCPP_ERROR(rclcpp::get_logger("DDMSSerialPort"),"Failed to read serial port data: %s (%ld)\n", strerror(errno), errno);
@@ -173,11 +166,6 @@ return_type DDMSSerial::read_frame(uint8_t * frame)
         return return_type::ERROR;
     }
     uint time =   std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::system_clock().now().time_since_epoch() - start).count();
-    //if(time > 20000000)
-        //RCLCPP_INFO(rclcpp::get_logger("DDMSSerialPort"),"time %d",time);
-    //if(crc_update((uint8_t *)&frame) != frame[DDSM_SERIAL_FRAME_SIZE-1]){
-    //    RCLCPP_ERROR(rclcpp::get_logger("DDMSSerialPort"),"CRC fail exp %d  act %d)\n", crc_update((uint8_t *)&frame), frame[DDSM_SERIAL_FRAME_SIZE-1]);
-    //}
     return return_type::SUCCESS;
 }
 
