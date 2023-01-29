@@ -13,7 +13,7 @@
 # limitations under the License.
 import os
 from launch import LaunchDescription
-from launch.actions import DeclareLaunchArgument, IncludeLaunchDescription
+from launch.actions import IncludeLaunchDescription, GroupAction
 from launch.conditions import IfCondition, UnlessCondition
 from launch.launch_description_sources import PythonLaunchDescriptionSource
 from launch.substitutions import Command, LaunchConfiguration, PythonExpression
@@ -34,7 +34,7 @@ def generate_launch_description():
     	[
     		FindPackageShare("ros2_control_demo_bringup"),
             	"config",
-            	"config/ekf.yaml"
+            	"ekf.yaml"
         ]
     )
             		
@@ -60,6 +60,20 @@ def generate_launch_description():
         [FindPackageShare("diffbot_description"), "config", "diffbot.rviz"]
     )
 
+# include realsense
+    realsense_run = GroupAction(
+        actions=[
+            IncludeLaunchDescription(
+                PythonLaunchDescriptionSource([
+                    FindPackageShare("realsense2_camera"), '/launch', '/rs_launch.py']),
+                    launch_arguments = {'pointcloud.enable':'true', 
+                                        'enable_gyro':'true',
+                                        'enable_accel':'true',
+                                        'depth_module.profile':'640x480x30'}.items(),
+            ),
+        ]
+    )
+
     control_node = Node(
         package="controller_manager",
         executable="ros2_control_node",
@@ -72,7 +86,7 @@ def generate_launch_description():
         output="both",
         parameters=[robot_description],
         remappings=[
-            ("/diff_drive_controller/cmd_vel_unstamped", "/cmd_vel"),
+            ("/diff_drive_controller/cmd_vel", "/cmd_vel"),
         ],
     )
     rviz_node = Node(
@@ -104,7 +118,7 @@ def generate_launch_description():
         ])
         
     # Delay rviz start after `joint_state_broadcaster`
-    delay_joint_state = RegisterEventHandler(
+    delay_robot_control_state = RegisterEventHandler(
         event_handler=OnProcessExit(
             target_action=robot_controller_spawner,
             on_exit=[joint_state_broadcaster_spawner],
@@ -115,23 +129,24 @@ def generate_launch_description():
     delay_robot_localization = RegisterEventHandler(
         event_handler=OnProcessExit(
             target_action=start_robot_localization_cmd,
-            on_exit=[robot_controller_spawner],
+            on_exit=[joint_state_broadcaster_spawner],
         )
     )
     # Delay start of robot_controller after `joint_state_broadcaster`
     delay_rviz = RegisterEventHandler(
         event_handler=OnProcessExit(
             target_action=rviz_node,
-            on_exit=[robot_controller_spawner],
+            on_exit=[joint_state_broadcaster_spawner],
         )
     )
     nodes = [
         control_node,
         robot_state_pub_node,
         robot_controller_spawner,
-        delay_joint_state,
-        delay_robot_localization,
-        delay_rviz,
+        delay_robot_control_state,
+        start_robot_localization_cmd,
+        realsense_run,
+        rviz_node,
     ]
 
     return LaunchDescription(nodes)
