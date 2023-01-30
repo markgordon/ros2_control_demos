@@ -1,0 +1,31 @@
+unite_imu_method: 2
+depth_module.profile: 640,480,15
+rgb_camera.profile: 640,480,15
+#                           {'name': 'gyro_fps',                     'default': '0', 'description': "''"},                           
+#                           {'name': 'accel_fps',                    'default': '0', 'description': "''"},                           
+enable_gyro: true 
+enable_accel: true 
+#                           {'name': 'pointcloud.enable',            'default': 'false', 'description': ''}, 
+#                           {'name': 'pointcloud.stream_filter',     'default': '2', 'description': 'texture stream for pointcloud'},
+#                           {'name': 'pointcloud.stream_index_filter','default': '0', 'description': 'texture stream index for pointcloud'},
+#                           {'name': 'enable_sync',                  'default': 'false', 'description': "''"},                           
+#                           {'name': 'align_depth.enable',           'default': 'false', 'description': "''"},                           
+#                           {'name': 'colorizer.enable',             'default': 'false', 'description': "''"},
+#                           {'name': 'clip_distance',                'default': '-2.', 'description': "''"},                           
+#                           {'name': 'linear_accel_cov',             'default': '0.01', 'description': "''"},                           
+#                           {'name': 'initial_reset',                'default': 'false', 'description': "''"},                           
+#                           {'name': 'allow_no_texture_points',      'default': 'false', 'description': "''"},                           
+#                           {'name': 'pointcloud.ordered_pc',        'default': 'false', 'description': ''},
+#                           {'name': 'calib_odom_file',              'default': "''", 'description': "''"},
+#                           {'name': 'topic_odom_in',                'default': "''", 'description': 'topic for T265 wheel odometry'},
+#                           {'name': 'tf_publish_rate',              'default': '0.0', 'description': 'Rate of publishing static_tf'},
+#                           {'name': 'diagnostics_period',           'default': '0.0', 'description': 'Rate of publishing diagnostics. 0=Disabled'},
+#                           {'name': 'decimation_filter.enable',     'default': 'false', 'description': 'Rate of publishing static_tf'},
+#                           {'name': 'rosbag_filename',              'default': "''", 'description': 'A realsense bagfile to run from as a device'},
+#                           {'name': 'depth_module.exposure.1',     'default': '7500', 'description': 'Initial value for hdr_merge filter'},
+#                           {'name': 'depth_module.gain.1',         'default': '16', 'description': 'Initial value for hdr_merge filter'},
+#                           {'name': 'depth_module.exposure.2',     'default': '1', 'description': 'Initial value for hdr_merge filter'},
+#                           {'name': 'depth_module.gain.2',         'default': '16', 'description': 'Initial value for hdr_merge filter'},
+#                           {'name': 'wait_for_device_timeout',      'default': '-1.', 'description': 'Timeout for waiting for device to connect (Seconds)'},
+#                           {'name': 'reconnect_timeout',            'default': '6.', 'description': 'Timeout(seconds) between consequtive reconnection attempts'},
+                        

@@ -148,9 +148,9 @@ return_type DDMSSerial::read_frame(uint8_t * frame)
             if(tries > 1 || frame[0] > 2)
             {
                 uint time =   std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::system_clock().now().time_since_epoch() - start).count();
-                RCLCPP_INFO(rclcpp::get_logger("DDMSSerialPort"),"fail time %d, %d, %d",time, tries,frame[0]);
+               // RCLCPP_INFO(rclcpp::get_logger("DDMSSerialPort"),"fail time %d, %d, %d",time, tries,frame[0]);
 
-                RCLCPP_ERROR(rclcpp::get_logger("DDMSSerialPort"),"rec %ld",num_bytes);
+               // RCLCPP_ERROR(rclcpp::get_logger("DDMSSerialPort"),"rec %ld",num_bytes);
                 if(num_bytes > 0) return return_type::NON_FATAL_READ_ERROR;
                 if (retval == -1 ) {
                     RCLCPP_ERROR(rclcpp::get_logger("DDMSSerialPort"),"Failed to read serial port data: %s (%d)\n", strerror(errno), errno);

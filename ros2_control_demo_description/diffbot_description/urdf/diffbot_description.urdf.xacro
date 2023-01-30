@@ -2,6 +2,8 @@
 <robot xmlns:xacro="http://www.ros.org/wiki/xacro">
 
   <xacro:macro name="diffbot" params="prefix">
+  <xacro:include filename="/home/mg/ros2_ddws/install/realsense2_description/share/realsense2_description/urdf/_d435i.urdf.xacro"/>
+  <xacro:include filename="/home/mg/ros2_ddws/install/realsense2_description/share/realsense2_description/urdf/_d435i_imu_modules.urdf.xacro"/>
 
   <!-- Constants for robot dimensions -->
   <xacro:property name="PI" value="3.1415926535897931"/>
@@ -14,34 +16,31 @@
   <xacro:property name="wheel_radius" value="0.05125" />
   <xacro:property name="wheel_offset_y" value="0.1115" />
   <xacro:property name="caster_wheel_mass" value="0.2" /> <!-- arbitrary value for caster wheel mass -->
-  <xacro:property name="caster_wheel_radius" value="0.058" />
+  <xacro:property name="caster_wheel_radius" value="0.033" />
   <xacro:property name="z_offset" value="-${base_height/2}" /> <!-- Space btw top of beam and the each joint -->
 
-  <!-- Base Link -->
+  <!-- *********************** Base Link *********************** -->
   <link name="${prefix}base_link">
-    <collision>
-      <origin xyz="0 0 0" rpy="0 0 0"/>
-    </collision>
   </link>
       <joint name="${prefix}base_joint" type="fixed">
       <parent link="${prefix}base_link"/>
       <child link="${prefix}base_platform"/>
-      <origin xyz="${-base_width/2} 0 ${base_height/2}" rpy="0 0 0"/>
+      <origin xyz="${-base_length/2} 0 ${wheel_radius}" rpy="0 0 0"/>
       <axis xyz="0 0 0"/>
     </joint>
     <link name="${prefix}base_platform">
 
       <collision>
-        <origin xyz="0 0 ${base_height/2}" rpy="0 0 0"/>
+        <origin xyz="0 0 0" rpy="0 0 0"/>
         <geometry>
-          <box size="${base_width} ${base_length} ${base_height}"/>
+          <box size="${base_length} ${base_width} ${base_height}"/>
         </geometry>
       </collision>
 
       <visual>
-        <origin xyz="0 0 ${base_height/2}" rpy="0 0 0"/>
+        <origin xyz="0 0 0" rpy="0 0 0"/>
         <geometry>
-          <box size="${base_width} ${base_length} ${base_height}"/>
+          <box size="${base_length} ${base_width} ${base_height}"/>
         </geometry>
         <material name="orange"/>
       </visual>
@@ -49,10 +48,17 @@
 
     </link>
 
+<!-- *********************** d435i *********************** -->
+
+  <xacro:sensor_d435i parent="base_link" use_nominal_extrinsics="false">
+    <origin xyz="0 0 ${wheel_radius}" rpy="0 0 0"/>
+  </xacro:sensor_d435i>
+<!-- *********************** caster rear wheel Link *********************** -->
+
     <joint name="${prefix}left_wheel_joint" type="continuous">
       <parent link="${prefix}base_link"/>
       <child link="${prefix}left_wheel"/>
-      <origin xyz="0 -${wheel_offset_y} ${z_offset}" rpy="0 0 0"/>
+      <origin xyz="0 -${wheel_offset_y} ${wheel_radius}" rpy="${PI/2} 0 0"/>
       <axis xyz="0 1 0"/>
       <dynamics damping="0.2"/>
     </joint>
@@ -60,34 +66,26 @@
     <!-- left wheel Link -->
     <link name="${prefix}left_wheel">
       <collision>
-        <origin xyz="0 0 0" rpy="${PI/2} 0 0"/>
+        <origin xyz="0 0 0" rpy="0 0 0"/>
         <geometry>
           <cylinder length="${wheel_len}" radius="${wheel_radius}"/>
         </geometry>
       </collision>
 
       <visual>
-        <origin xyz="0 0 0" rpy="${PI/2} 0 0"/>
+        <origin xyz="0 0 0" rpy="0 0 0"/>
         <geometry>
           <cylinder length="${wheel_len}" radius="${wheel_radius}"/>
         </geometry>
         <material name="black"/>
       </visual>
-
-      <inertial>
-        <origin xyz="0 0 0" rpy="${PI/2} 0 0"/>
-        <mass value="${wheel_mass}"/>
-        <inertia
-          ixx="${wheel_mass / 12.0 * (3*wheel_radius + wheel_len*wheel_len)}" ixy="0.0" ixz="0.0"
-          iyy="${wheel_mass / 12.0 * wheel_radius*wheel_radius}" iyz="0.0"
-          izz="${wheel_mass / 12.0 * wheel_radius*wheel_radius}"/>
-        </inertial>
       </link>
+<!-- *********************** caster rear wheel Link *********************** -->
 
     <joint name="${prefix}right_wheel_joint" type="continuous">
       <parent link="${prefix}base_link"/>
       <child link="${prefix}right_wheel"/>
-      <origin xyz="0 ${wheel_offset_y} ${z_offset}" rpy="0 0 0"/>
+      <origin xyz="0  ${wheel_offset_y} ${wheel_radius}" rpy="${PI/2} 0 0"/>
       <axis xyz="0 1 0"/>
       <dynamics damping="0.2"/>
     </joint>
@@ -95,37 +93,29 @@
     <!-- right wheel Link -->
     <link name="${prefix}right_wheel">
       <collision>
-        <origin xyz="0 0 0" rpy="${PI/2} 0 0"/>
+        <origin xyz="0 0 0" rpy="0 0 0"/>
         <geometry>
           <cylinder length="${wheel_len}" radius="${wheel_radius}"/>
         </geometry>
       </collision>
 
       <visual>
-        <origin xyz="0 0 0" rpy="${PI/2} 0 0"/>
+        <origin xyz="0 0 0" rpy="0 0 0"/>
         <geometry>
           <cylinder length="${wheel_len}" radius="${wheel_radius}"/>
         </geometry>
         <material name="black"/>
       </visual>
 
-      <inertial>
-        <origin xyz="0 0 0" rpy="${PI/2} 0 0"/>
-        <mass value="${wheel_mass}"/>
-        <inertia
-          ixx="${wheel_mass / 12.0 * (3*wheel_radius + wheel_len*wheel_len)}" ixy="0.0" ixz="0.0"
-          iyy="${wheel_mass / 12.0 * wheel_radius*wheel_radius}" iyz="0.0"
-          izz="${wheel_mass / 12.0 * wheel_radius*wheel_radius}"/>
-        </inertial>
       </link>
+    <!-- *********************** caster rear wheel Link *********************** -->
 
     <joint name="${prefix}caster_rear_wheel_joint" type="fixed">
       <parent link="${prefix}base_link"/>
       <child link="${prefix}caster_rear_wheel"/>
-      <origin xyz="${-base_width + caster_wheel_radius} 0 ${z_offset}" rpy="0 0 0"/>
+      <origin xyz="${-base_width + caster_wheel_radius} 0 ${caster_wheel_radius}" rpy="0 0 0"/>
     </joint>
 
-    <!-- caster rear wheel Link -->
     <link name="${prefix}caster_rear_wheel">
       <collision>
         <origin xyz="0 0 0" rpy="0 0 0"/>
@@ -151,7 +141,32 @@
           izz="${caster_wheel_mass * 0.4 * (caster_wheel_radius * caster_wheel_radius)}"/>
         </inertial>
       </link>
+  <!-- *********************** LIDAR SETUP **********************************  -->
+  <joint name="lidar_joint" type="fixed">
+    <parent link="base_link"/>
+    <child link="lidar_link"/>
+    <origin xyz="-.120 0 .080" rpy="0 0 0"/>
+  </joint>
 
+  <link name="lidar_link">
+  
+    <collision>
+     <origin xyz="0 0 0" rpy="0 0 0"/>
+     <geometry>
+      <cylinder radius="0.0508" length="0.080"/>
+     </geometry>
+    </collision>
+    
+    <visual>
+     <origin xyz="0 0 0" rpy="0 0 0"/>
+     <geometry>
+      <cylinder radius="0.0508" length="0.08"/>
+     </geometry>
+     <material name="Black">
+          <color rgba="${0/255} ${0/255} ${0/255} 1.0"/>
+     </material>
+    </visual>
+  </link>
   </xacro:macro>
 
 </robot>
