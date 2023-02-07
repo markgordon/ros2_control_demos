@@ -2,8 +2,8 @@
 <robot xmlns:xacro="http://www.ros.org/wiki/xacro">
 
   <xacro:macro name="diffbot" params="prefix">
-  <xacro:include filename="/home/mg/ros2_ddws/install/realsense2_description/share/realsense2_description/urdf/_d435i.urdf.xacro"/>
-  <xacro:include filename="/home/mg/ros2_ddws/install/realsense2_description/share/realsense2_description/urdf/_d435i_imu_modules.urdf.xacro"/>
+  <xacro:include filename="/home/mg/ws2/install/realsense2_description/share/realsense2_description/urdf/_d435i.urdf.xacro"/>
+  <xacro:include filename="/home/mg/ws2/install/realsense2_description/share/realsense2_description/urdf/_d435i_imu_modules.urdf.xacro"/>
 
   <!-- Constants for robot dimensions -->
   <xacro:property name="PI" value="3.1415926535897931"/>
@@ -20,34 +20,23 @@
   <xacro:property name="z_offset" value="-${base_height/2}" /> <!-- Space btw top of beam and the each joint -->
 
   <!-- *********************** Base Link *********************** -->
-  <link name="${prefix}base_link">
-  </link>
-      <joint name="${prefix}base_joint" type="fixed">
-      <parent link="${prefix}base_link"/>
-      <child link="${prefix}base_platform"/>
-      <origin xyz="${-base_length/2} 0 ${wheel_radius}" rpy="0 0 0"/>
-      <axis xyz="0 0 0"/>
-    </joint>
-    <link name="${prefix}base_platform">
+  <link name="${prefix}base_link"/>
 
+  <link name="${prefix}base_footprint">
       <collision>
         <origin xyz="0 0 0" rpy="0 0 0"/>
         <geometry>
           <box size="${base_length} ${base_width} ${base_height}"/>
         </geometry>
       </collision>
-
-      <visual>
-        <origin xyz="0 0 0" rpy="0 0 0"/>
-        <geometry>
-          <box size="${base_length} ${base_width} ${base_height}"/>
-        </geometry>
-        <material name="orange"/>
-      </visual>
-
-
     </link>
 
+  <joint name="${prefix}base_joint" type="fixed">
+      <parent link="${prefix}base_link"/>
+      <child link="${prefix}base_footprint"/>
+      <origin xyz="${-base_length/2} 0 ${wheel_radius}" rpy="0 0 0"/>
+      <axis xyz="0 0 0"/>
+  </joint>
 <!-- *********************** d435i *********************** -->
 
   <xacro:sensor_d435i parent="base_link" use_nominal_extrinsics="false">
@@ -144,11 +133,11 @@
   <!-- *********************** LIDAR SETUP **********************************  -->
   <joint name="lidar_joint" type="fixed">
     <parent link="base_link"/>
-    <child link="lidar_link"/>
+    <child link="base_scan"/>
     <origin xyz="-.120 0 .080" rpy="0 0 0"/>
   </joint>
 
-  <link name="lidar_link">
+  <link name="base_scan">
   
     <collision>
      <origin xyz="0 0 0" rpy="0 0 0"/>

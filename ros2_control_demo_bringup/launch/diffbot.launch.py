@@ -150,10 +150,11 @@ def generate_launch_description():
             name='sllidar_node',
             parameters=[{'serial_port': '/dev/serial/by-id/usb-Silicon_Labs_CP2102N_USB_to_UART_Bridge_Controller_ceefc1d94513ec11937bf4ef7a109228-if00-port0'},
                         { 'serial_baudrate': 1000000 },
-                         {'frame_id': 'laser'},
+                         {'frame_id': 'base_scan'},
                          {'inverted': False },
                          {'angle_compensate': True },
-                         {'scan_mode': 'DenseBoost'}],
+                         {'scan_mode': 'DenseBoost'},
+                         {'scan_frequency': 10.0}],
             output='screen')
 
     control_node = Node(
@@ -222,7 +223,7 @@ def generate_launch_description():
         lidar_node,
         #start_robot_localization_cmd,
         #launch_rs,
-        rviz_node,
+        #rviz_node,
     ]
 
     return LaunchDescription(nodes)
