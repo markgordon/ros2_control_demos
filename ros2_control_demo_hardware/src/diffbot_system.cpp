@@ -219,14 +219,15 @@ hardware_interface::return_type DiffBotSystemHardware::read(
                 delta = round((2*M_PI - last_angle_[i] + state[1])*1000)/1000.0;
               }
             }
-           // RCLCPP_INFO(rclcpp::get_logger("DiffBotSystemHardware"), "id %d last %f :current %f sp %f",i,last_angle_[i] ,state[1],state[0],delta);
+//           RCLCPP_INFO(rclcpp::get_logger("DiffBotSystemHardware"), "id %d last %f :current %f sp %f",i,last_angle_[i] ,state[1],state[0]);
 
             current_wheel_position_[i]+=delta;
           }
           last_angle_[i] = state[1];
 
       }
-      //RCLCPP_INFO(rclcpp::get_logger("DiffBotSystemHardware"), "pos %f",current_wheel_position_[i]);
+          // RCLCPP_INFO(rclcpp::get_logger("DiffBotSystemHardware"), "id %d last %f :current %f sp %f",i,last_angle_[i] ,state[1],state[0]);
+
 
       hw_velocities_[i] = state[0];
       hw_positions_[i] = current_wheel_position_[i];
