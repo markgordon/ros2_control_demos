@@ -102,24 +102,30 @@ hardware_interface::CallbackReturn DiffBotSystemHardware::on_init(
       return hardware_interface::CallbackReturn::ERROR;
     }
   }
-    RCLCPP_INFO(rclcpp::get_logger("DiffBotSystemHardware"), "open port");
-
   port1 = "/dev/serial/by-id/usb-1a86_USB_Single_Serial_54D2035530-if00";
-  ddms_diff::return_type ret = wheel_command[0].open(port1);
-  if(ret != ddms_diff::return_type::SUCCESS)
+  RCLCPP_INFO(rclcpp::get_logger("DiffBotSystemHardware"), "open port");
+  int ID = wheel_command[0].open(port1);
+  if(ID == -1)
   {
-    RCLCPP_FATAL(rclcpp::get_logger("DiffBotSystemHardware"),"Couldn't open port %s, code %i",port1.c_str(),(int)ret);
-    return hardware_interface::CallbackReturn::ERROR;
+      RCLCPP_FATAL(
+        rclcpp::get_logger("DiffBotSystemHardware"),"DDSM Couldn't open port %s, code %i",port1.c_str(),ID);
+      return hardware_interface::CallbackReturn::ERROR;
+  }else{
+      RCLCPP_INFO(rclcpp::get_logger("DiffBotSystemHardware"),"Wheel %i Connected to %s",ID,port1.c_str());
   }
-  
-  port2 = "/dev/serial/by-id/usb-FTDI_FT232R_USB_UART_A9XOMIL6-if00-port0";
-  ret = wheel_command[1].open(port2);
 
-  if(ret != ddms_diff::return_type::SUCCESS)
+  port2 = "/dev/serial/by-id/usb-FTDI_FT232R_USB_UART_A9XOMIL6-if00-port0";
+  ID = wheel_command[1].open(port2);
+
+  if(ID == -1)
   {
-    RCLCPP_FATAL(rclcpp::get_logger("DiffBotSystemHardware"),"Couldn't open port %s, code %i",port2.c_str(),(int)ret);
-    return hardware_interface::CallbackReturn::ERROR;
+      RCLCPP_FATAL(
+        rclcpp::get_logger("DiffBotSystemHardware"),"DDSM Couldn't open port %s, code %i",port2.c_str(),ID);
+      return hardware_interface::CallbackReturn::ERROR;
+  }else{
+      RCLCPP_INFO(rclcpp::get_logger("DiffBotSystemHardware"),"Wheel %i Connected to %s",ID,port2.c_str());
   }
+
 
   return hardware_interface::CallbackReturn::SUCCESS;
 }
