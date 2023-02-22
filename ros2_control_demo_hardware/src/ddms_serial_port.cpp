@@ -27,13 +27,13 @@ DDMSSerial::~DDMSSerial()
     close();
 }
 
-int DDMSSerial::open(const std::string & port_name)
+ddms_diff::return_type DDMSSerial::open(const std::string & port_name)
 {
     serial_port_ = ::open(port_name.c_str(), O_RDWR | O_NOCTTY);
 
     if (serial_port_ < 0) {
         fprintf(stderr, "Failed to open serial port: %s (%d)\n", strerror(errno), errno);
-        return (int)return_type::ERROR;
+        return return_type::ERROR;
     }
     //make it exclusive
     ioctl(serial_port_, TIOCEXCL);
@@ -46,7 +46,7 @@ int DDMSSerial::open(const std::string & port_name)
     if (::tcgetattr(serial_port_, &tty_config) != 0) {
         fprintf(stderr, "Failed to get serial port configuration: %s (%d)\n", strerror(errno), errno);
         close();
-        return (int)return_type::ERROR;
+        return return_type::ERROR;
     }
 
     memset(&tty_config, 0, sizeof(termios));
@@ -65,24 +65,10 @@ int DDMSSerial::open(const std::string & port_name)
     if (::tcsetattr(serial_port_, TCSANOW, &tty_config) != 0) {
         fprintf(stderr, "Failed to set serial port configuration: %s (%d)\n", strerror(errno), errno);
         close();
-        return (int)return_type::ERROR;
+        return return_type::ERROR;
     }
-    interrogate_motor int_mot;
-    uint8_t ID;
-    for (int i=0;i<3;i++){
-        write_frame((uint8_t *)& int_mot);
-        usleep(5000);
-    }
-    tcflush(serial_port_, TCIFLUSH);
-    if(write_frame((uint8_t *)& int_mot)== return_type::SUCCESS){
-        usleep(5000);
-        uint8_t frame[10];
-        if(read_frame(frame)!=return_type::SUCCESS) return -1;
-        //motor_state reply
-        ID = frame[0];
-    }
-    
-    return (int)ID;
+
+    return return_type::SUCCESS;
 }
 
 ddms_diff::return_type DDMSSerial::close()
@@ -158,7 +144,8 @@ return_type DDMSSerial::read_frame(uint8_t * frame)
       // as far as possible to tell.
         if(num_bytes == 9){
             //so if we wait just a few milliseconds the next call won't fail.......
-            if(tries > 9 || frame[0] > 2)
+            //RCLCPP_INFO(rclcpp::get_logger("DDMSSerialPort"),"ppp");
+            if(tries > 1 || frame[0] > 2)
             {
                 uint time =   std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::system_clock().now().time_since_epoch() - start).count();
                // RCLCPP_INFO(rclcpp::get_logger("DDMSSerialPort"),"fail time %d, %d, %d",time, tries,frame[0]);
@@ -166,16 +153,16 @@ return_type DDMSSerial::read_frame(uint8_t * frame)
                // RCLCPP_ERROR(rclcpp::get_logger("DDMSSerialPort"),"rec %ld",num_bytes);
                 if(num_bytes > 0) return return_type::NON_FATAL_READ_ERROR;
                 if (retval == -1 ) {
-                    RCLCPP_ERROR(rclcpp::get_logger("DDMSSerialPort")," DDSM Failed to read serial port data: %s (%d)\n", strerror(errno), errno);
+                    RCLCPP_ERROR(rclcpp::get_logger("DDMSSerialPort"),"Failed to read serial port data: %s (%d)\n", strerror(errno), errno);
                 }
                 return return_type::ERROR;
             }
         }
-    }while(retval > -1 && num_bytes < 10 && tries <11);
-                //ROS_INFO("answer %02x%02x%02x%02x%02x%02x%02x%02x%02x %02x, bytes %d, tries %d",
-                //frame[0],frame[1],frame[2],frame[3],frame[4],frame[5],frame[6],frame[7],frame[8], frame[9],num_bytes,tries);
+    }while(retval > -1 && num_bytes < 10 );
+                //RCLCPP_INFO(rclcpp::get_logger("DDMSSerialPort"),"answer %02x%02x%02x%02x%02x%02x%02x%02x%02x %02x",
+                //frame[0],frame[1],frame[2],frame[3],frame[4],frame[5],frame[6],frame[7],frame[8], frame[9]);
     if (retval == -1 ) {
-        RCLCPP_ERROR(rclcpp::get_logger("DDMSSerialPort"),"DDSM Failed to read serial port data: %s (%d)\n", strerror(errno), errno);
+        RCLCPP_ERROR(rclcpp::get_logger("DDMSSerialPort"),"Failed to read serial port data: %s (%d)\n", strerror(errno), errno);
         return return_type::ERROR;
     }
    //uint time =   std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::system_clock().now().time_since_epoch() - start).count();

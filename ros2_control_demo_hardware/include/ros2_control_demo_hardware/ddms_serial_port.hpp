@@ -28,7 +28,7 @@ namespace ddms_diff
         DDMSSerial();
         ~DDMSSerial();
         
-        int open(const std::string & port_name);
+        return_type open(const std::string & port_name);
         return_type close();
         return_type motor_command(uint8_t ID, double commanded_value);
         ddms_diff::return_type get_wheel_state(uint8_t ID,double velocity,std::vector<double> & current_wheel_state);
