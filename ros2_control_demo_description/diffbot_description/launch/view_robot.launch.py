@@ -19,6 +19,12 @@ from launch.substitutions import Command, FindExecutable, LaunchConfiguration, P
 from launch_ros.actions import Node
 from launch_ros.substitutions import FindPackageShare
 
+#    arg name="model" default="$(find realsense2_description)/urdf/test_d435_camera.urdf.xacro"/>
+ ##
+   # <!-- this will include the launch file for gazebo given the model -->  
+   # <include file="$(find realsense2_description)/launch/gazebo.launch">
+   #   <arg name="model" value="$(arg model)" />
+   #  <node name="rviz" pkg="rviz" type="rviz" args="-d $(find realsense2_description)/rviz/urdf.rviz" required="true" />
 
 def generate_launch_description():
     # Declare arguments
@@ -34,7 +40,7 @@ def generate_launch_description():
     declared_arguments.append(
         DeclareLaunchArgument(
             "description_file",
-            default_value="diffbot.urdf.xacro",
+            default_value="two_wheeled_robot_nav2.urdf",
             description="URDF/XACRO description file with the robot.",
         )
     )

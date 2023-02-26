@@ -55,10 +55,11 @@ def generate_launch_description():
           'qos_scan':qos,
           'qos_image':qos,
           'qos_imu':qos,
+          'approx_sync':False,
           # RTAB-Map's parameters should be strings:
           'Reg/Strategy':'1',
           'Reg/Force3DoF':'true',
-          'RGBD/NeighborLinkRefining':'True',
+          'RGBD/NeighborLinkRefining':'true',
           'Grid/RangeMin':'0.2', # ignore laser scan points on the robot itself
           'Optimizer/GravitySigma':'0', # Disable imu constraints (we are already in 2D)
           'camera_name':'camera_color_frame'
@@ -90,7 +91,7 @@ def generate_launch_description():
         # Nodes to launch
         Node(
             package='rtabmap_ros', executable='rgbd_sync', output='screen',
-            parameters=[parameters],
+            parameters=[{'approx_sync':False, 'use_sim_time':use_sim_time, 'qos':qos}],
             remappings=remappings),
 
         # SLAM Mode:
@@ -99,7 +100,8 @@ def generate_launch_description():
             package='rtabmap_ros', executable='rtabmap', output='screen',
             parameters=[parameters],
             remappings=remappings,
-            arguments=['-d']),
+            #arguments=['-d']
+            ),
             
         # Localization mode:
         Node(
