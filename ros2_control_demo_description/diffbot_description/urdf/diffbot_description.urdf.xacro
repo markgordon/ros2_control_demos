@@ -3,6 +3,7 @@
 
   <xacro:macro name="diffbot" params="prefix">
   <xacro:include filename="/home/mg/ws2/install/realsense2_description/share/realsense2_description/urdf/_d435i.urdf.xacro"/>
+  <xacro:include filename="/home/mg/ws2/install/realsense2_description/share/realsense2_description/urdf/_d435.urdf.xacro"/>
   <xacro:include filename="/home/mg/ws2/install/realsense2_description/share/realsense2_description/urdf/_d435i_imu_modules.urdf.xacro"/>
 
   <!-- Constants for robot dimensions -->
@@ -41,9 +42,9 @@
 
 <!-- *********************** d435i *********************** -->
 
-  <xacro:sensor_d435i parent="base_link" use_nominal_extrinsics="false">
+  <xacro:sensor_d435 parent="base_link" use_nominal_extrinsics="false">
     <origin xyz="0 0 ${wheel_radius}" rpy="0 0 0"/>
-  </xacro:sensor_d435i>
+  </xacro:sensor_d435>
 <!-- *********************** caster rear wheel Link *********************** -->
 
     <joint name="${prefix}left_wheel_joint" type="continuous">

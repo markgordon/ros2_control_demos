@@ -53,12 +53,15 @@ def generate_launch_description():
     static_tf = Node(
             package='tf2_ros', executable='static_transform_publisher', output='screen',
             arguments=['0', '0', '0', '-1.570796327', '0', '-1.570796327', 'camera_link', 'camera_color_optical_frame'])
-    
+    static_tf2 = Node(
+            package='tf2_ros', executable='static_transform_publisher', output='screen',
+            arguments=['0', '0', '0', '-1.570796327', '0', '-1.570796327', 'camera_link', 'camera_depth_optical_frame'])  
     spawn_entity = Node(package='gazebo_ros', executable='spawn_entity.py',
                         arguments=['-topic', 'robot_description',
                                    '-entity', 'diffbot',
                                     '-y','2',
                                     '-x','2',
+                                    '-z','.1',
                                    ],
                         output='screen')
 
@@ -97,4 +100,5 @@ def generate_launch_description():
         node_robot_state_publisher,
         spawn_entity,
         static_tf,
+        static_tf2,
     ])
